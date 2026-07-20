@@ -153,3 +153,181 @@ export function subscribeBand(bandId, onChange) {
     .subscribe();
   return () => supabase.removeChannel(ch);
 }
+
+/* ============================================================
+   v2 — setlist multiple, agenda, file, commenti, attività
+   ============================================================ */
+
+/* ---------- setlist ---------- */
+export async function getSetlists(bandId) {
+  const { data, error } = await supabase
+    .from("setlists")
+    .select("*, setlist_songs(*)")
+    .eq("band_id", bandId)
+    .order("created_at");
+  if (error) throw error;
+  return data.map((s) => ({
+    id: s.id, nome: s.nome, data: s.data, luogo: s.luogo, note: s.note,
+    archived: s.archived, publicToken: s.public_token,
+    rows: (s.setlist_songs || []).sort((a, b) => a.ordine - b.ordine),
+  }));
+}
+export async function createSetlist(bandId, { nome, data = null, luogo = "" }) {
+  const { data: row, error } = await supabase.from("setlists")
+    .insert({ band_id: bandId, nome, data, luogo }).select().single();
+  if (error) throw error;
+  return row.id;
+}
+export async function updateSetlist(id, patch) {
+  const { error } = await supabase.from("setlists").update(patch).eq("id", id);
+  if (error) throw error;
+}
+export async function deleteSetlist(id) {
+  const { error } = await supabase.from("setlists").delete().eq("id", id);
+  if (error) throw error;
+}
+export async function duplicateSetlist(bandId, setlist, nuovoNome) {
+  const newId = await createSetlist(bandId, { nome: nuovoNome, data: setlist.data, luogo: setlist.luogo });
+  if (setlist.rows.length) {
+    const { error } = await supabase.from("setlist_songs")
+      .insert(setlist.rows.map((r) => ({ setlist_id: newId, song_id: r.song_id, ordine: r.ordine })));
+    if (error) throw error;
+  }
+  return newId;
+}
+export async function addToSetlist(setlistId, songId, ordine) {
+  const { error } = await supabase.from("setlist_songs")
+    .upsert({ setlist_id: setlistId, song_id: songId, ordine }, { onConflict: "setlist_id,song_id" });
+  if (error) throw error;
+}
+export async function removeFromSetlist(setlistId, songId) {
+  const { error } = await supabase.from("setlist_songs")
+    .delete().eq("setlist_id", setlistId).eq("song_id", songId);
+  if (error) throw error;
+}
+export async function setRowOrder(rowId, ordine) {
+  const { error } = await supabase.from("setlist_songs").update({ ordine }).eq("id", rowId);
+  if (error) throw error;
+}
+export async function replaceSetlistSongs(setlistId, songIds) {
+  const { error: e1 } = await supabase.from("setlist_songs").delete().eq("setlist_id", setlistId);
+  if (e1) throw e1;
+  if (songIds.length) {
+    const { error: e2 } = await supabase.from("setlist_songs")
+      .insert(songIds.map((sid, i) => ({ setlist_id: setlistId, song_id: sid, ordine: i + 1 })));
+    if (e2) throw e2;
+  }
+}
+
+/* ---------- agenda ---------- */
+export async function getEvents(bandId) {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*, event_availability(*)")
+    .eq("band_id", bandId)
+    .order("data");
+  if (error) throw error;
+  return data;
+}
+export async function createEvent(bandId, ev) {
+  const { error } = await supabase.from("events").insert({ band_id: bandId, ...ev });
+  if (error) throw error;
+}
+export async function updateEvent(id, patch) {
+  const { error } = await supabase.from("events").update(patch).eq("id", id);
+  if (error) throw error;
+}
+export async function deleteEvent(id) {
+  const { error } = await supabase.from("events").delete().eq("id", id);
+  if (error) throw error;
+}
+export async function setAvailability(eventId, memberId, stato) {
+  const { error } = await supabase.from("event_availability")
+    .upsert({ event_id: eventId, member_id: memberId, stato });
+  if (error) throw error;
+}
+
+/* ---------- file (registrazioni + spartiti) ---------- */
+export async function getSongFiles(songId) {
+  const { data, error } = await supabase.from("song_files")
+    .select("*").eq("song_id", songId).order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+export async function uploadSongFile(bandId, songId, file, tipo) {
+  const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+  const path = `${bandId}/${songId}/${Date.now()}-${safe}`;
+  const { error: e1 } = await supabase.storage.from("band-files")
+    .upload(path, file, { contentType: file.type || undefined });
+  if (e1) throw e1;
+  const { error: e2 } = await supabase.from("song_files").insert({
+    band_id: bandId, song_id: songId, tipo, nome: file.name,
+    path, mime: file.type || "", size: file.size || null,
+  });
+  if (e2) throw e2;
+}
+export async function fileUrl(path) {
+  const { data, error } = await supabase.storage.from("band-files").createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+export async function deleteSongFile(row) {
+  await supabase.storage.from("band-files").remove([row.path]);
+  const { error } = await supabase.from("song_files").delete().eq("id", row.id);
+  if (error) throw error;
+}
+
+/* ---------- commenti ---------- */
+export async function getComments(songId) {
+  const { data, error } = await supabase.from("song_comments")
+    .select("*").eq("song_id", songId).order("created_at");
+  if (error) throw error;
+  return data;
+}
+export async function addComment(bandId, songId, userId, autore, body, timestampSec = null) {
+  const { error } = await supabase.from("song_comments").insert({
+    band_id: bandId, song_id: songId, user_id: userId, autore, body, timestamp_sec: timestampSec,
+  });
+  if (error) throw error;
+}
+export async function deleteComment(id) {
+  const { error } = await supabase.from("song_comments").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ---------- registro attività ---------- */
+export async function logActivity(bandId, userId, autore, azione) {
+  // fire-and-forget: un log fallito non deve bloccare l'azione principale
+  supabase.from("activity_log")
+    .insert({ band_id: bandId, user_id: userId, autore, azione })
+    .then(({ error }) => error && console.warn("activity log:", error.message));
+}
+export async function getActivity(bandId, limit = 40) {
+  const { data, error } = await supabase.from("activity_log")
+    .select("*").eq("band_id", bandId)
+    .order("created_at", { ascending: false }).limit(limit);
+  if (error) throw error;
+  return data;
+}
+
+/* ---------- scaletta pubblica ---------- */
+export async function getPublicSetlist(token) {
+  const { data, error } = await supabase.rpc("get_public_setlist", { _token: token });
+  if (error) throw error;
+  return data; // null se token inesistente
+}
+
+/* ---------- realtime v2 ---------- */
+export function subscribeBandV2(bandId, onChange) {
+  const ch = supabase
+    .channel(`band2-${bandId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "setlists", filter: `band_id=eq.${bandId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "setlist_songs" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `band_id=eq.${bandId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "event_availability" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "song_comments", filter: `band_id=eq.${bandId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "activity_log", filter: `band_id=eq.${bandId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "song_files", filter: `band_id=eq.${bandId}` }, onChange)
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}

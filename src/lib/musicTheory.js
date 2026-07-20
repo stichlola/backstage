@@ -74,3 +74,48 @@ export const detectKeyFromChords = (chords) => {
   }
   return best?.label || null;
 };
+
+/* ---------- Suggerimento capotasto ----------
+   Data la tonalità effettiva, propone dove mettere il capo per
+   suonare con le diteggiature aperte più comode. */
+const OPEN_SHAPES_MAJ = ["C", "G", "D", "A", "E"];
+const OPEN_SHAPES_MIN = ["Am", "Em", "Dm"];
+
+export function suggestCapo(effKey) {
+  if (!effKey) return [];
+  const m = effKey.match(/^([A-G](?:#|b)?)(m?)$/);
+  if (!m) return [];
+  const effIdx = noteIndex(m[1]);
+  const minor = m[2] === "m";
+  const shapes = minor ? OPEN_SHAPES_MIN : OPEN_SHAPES_MAJ;
+  const out = [];
+  for (const shape of shapes) {
+    const sIdx = noteIndex(shape.replace("m", ""));
+    const capo = (effIdx - sIdx + 12) % 12;
+    if (capo >= 1 && capo <= 7) out.push({ capo, shape });
+  }
+  return out.sort((a, b) => a.capo - b.capo).slice(0, 2);
+}
+
+/* ---------- Import ChordPro ----------
+   Rimuove le direttive {…} tenendo testo e accordi [X], che sono
+   già nel formato nativo dell'app. Restituisce anche titolo/artista
+   se presenti nelle direttive. */
+export function chordProImport(text) {
+  let titolo = null, artista = null;
+  const lines = [];
+  for (const raw of (text || "").split("\n")) {
+    const line = raw.trimEnd();
+    const dir = line.match(/^\{\s*([a-zA-Z_]+)\s*:?\s*(.*?)\s*\}$/);
+    if (dir) {
+      const k = dir[1].toLowerCase();
+      if (k === "title" || k === "t") titolo = dir[2];
+      else if (k === "artist" || k === "subtitle" || k === "st") artista = artista || dir[2];
+      else if (k === "comment" || k === "c") lines.push("(" + dir[2] + ")");
+      // ogni altra direttiva ({soc},{eoc},{define}…) viene ignorata
+      continue;
+    }
+    lines.push(line);
+  }
+  return { sheet: lines.join("\n").replace(/\n{3,}/g, "\n\n").trim(), titolo, artista };
+}

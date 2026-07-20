@@ -193,6 +193,7 @@ export function SongCard({ song, colors, membersCount, onOpen, onAdvance, onDele
         <span className="mono chip">{song.bpm ? song.bpm + " BPM" : "—"}</span>
         <span className="mono chip">{fmtDur(song.durata)}</span>
         {song.voce && <span className="chip">🎤 {song.voce}</span>}
+        {(song.tags || []).slice(0, 3).map((t) => <span key={t} className="chip chip-tag">#{t}</span>)}
         {membersCount > 0 && <span className="chip">👥 {(song.sanno || []).length}/{membersCount}</span>}
       </div>
       {song.note && <div className="card-note">{song.note}</div>}

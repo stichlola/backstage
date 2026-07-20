@@ -1,18 +1,79 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { NOTES, transposeKeyName, extractChords, detectKeyFromChords } from "../lib/musicTheory";
+import { NOTES, transposeKeyName, extractChords, detectKeyFromChords, suggestCapo, chordProImport } from "../lib/musicTheory";
 import { STATI, fmtDur } from "../lib/themes";
 import { ChordSheet, useMetronome } from "./common";
+import * as db from "../lib/db";
 
-export function DetailModal({ song, members, onPatch, onClose, playing, playPreview }) {
+const TAG_PRESET = ["rock", "pop", "lenta", "energica", "ballabile", "apertura", "chiusura", "bis", "acustica", "medley"];
+
+export function DetailModal({ song, members, band, profile, onPatch, onClose, playing, playPreview, onActivity }) {
   const [tab, setTab] = useState("info");
   const [editSheet, setEditSheet] = useState(false);
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState(null);
   const [detected, setDetected] = useState(null);
+  const [files, setFiles] = useState(null);          // registrazioni + allegati
+  const [fileUrls, setFileUrls] = useState({});      // id -> signed url (audio)
+  const [uploading, setUploading] = useState(false);
+  const [comments, setComments] = useState(null);
+  const [newComment, setNewComment] = useState("");
+  const [commentMin, setCommentMin] = useState("");
+  const [newTag, setNewTag] = useState("");
   const metro = useMetronome();
   const taps = useRef([]);
   useEffect(() => () => metro.stop(), []); // eslint-disable-line
+
+  /* carica file e commenti all'apertura */
+  const loadFiles = () => db.getSongFiles(song.id).then(async (fs) => {
+    setFiles(fs);
+    const urls = {};
+    for (const f of fs.filter((x) => x.tipo === "audio")) {
+      try { urls[f.id] = await db.fileUrl(f.path); } catch { /* scaduto */ }
+    }
+    setFileUrls(urls);
+  }).catch(() => setFiles([]));
+  const loadComments = () => db.getComments(song.id).then(setComments).catch(() => setComments([]));
+  useEffect(() => { loadFiles(); loadComments(); }, [song.id]); // eslint-disable-line
+
+  const upload = async (fileList, tipo) => {
+    const file = fileList?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      await db.uploadSongFile(band.id, song.id, file, tipo);
+      onActivity?.(`ha caricato ${tipo === "audio" ? "una registrazione" : "un allegato"} su «${song.titolo}»`);
+      await loadFiles();
+    } catch (e) { console.error(e); alert("Caricamento fallito: " + e.message); }
+    setUploading(false);
+  };
+  const rimuoviFile = async (f) => {
+    if (!window.confirm(`Eliminare "${f.nome}"?`)) return;
+    try { await db.deleteSongFile(f); await loadFiles(); } catch (e) { console.error(e); }
+  };
+  const inviaCommento = async () => {
+    const body = newComment.trim();
+    if (!body) return;
+    let ts = null;
+    const m = commentMin.trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (m) ts = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    try {
+      await db.addComment(band.id, song.id, profile.id, profile.nome, body, ts);
+      setNewComment(""); setCommentMin("");
+      await loadComments();
+    } catch (e) { console.error(e); }
+  };
+  const toggleTag = (t) => {
+    const tags = song.tags || [];
+    p({ tags: tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t] });
+  };
+  const importaChordPro = () => {
+    const res = chordProImport(song.sheet || "");
+    const patch = { sheet: res.sheet };
+    if (res.titolo && !song.apiId) patch.titolo = res.titolo;
+    if (res.artista && !song.artista) patch.artista = res.artista;
+    p(patch);
+  };
 
   const p = (patch) => onPatch(song, patch);
   const effKey = transposeKeyName(song.tonalita, song.transpose || 0);
@@ -71,7 +132,7 @@ export function DetailModal({ song, members, onPatch, onClose, playing, playPrev
         </div>
 
         <div className="tabs tabs-detail">
-          {[["info", "Prova"], ["sheet", "Testo & accordi"], ["media", "Ascolta"]].map(([id, l]) => (
+          {[["info", "Prova"], ["sheet", "Testo & accordi"], ["media", "Ascolta"], ["disc", `Discussione${comments?.length ? ` (${comments.length})` : ""}`]].map(([id, l]) => (
             <button key={id} className={"tab" + (tab === id ? " tab-on" : "")} onClick={() => setTab(id)}>{l}</button>
           ))}
         </div>
@@ -95,6 +156,14 @@ export function DetailModal({ song, members, onPatch, onClose, playing, playPrev
                   <button className="btn btn-ghost" onClick={() => p({ transpose: 0 })}>Reset</button>
                 </div>
                 {song.tonalita && <div className="tool-hint">Tonalità effettiva: <b className="mono">{effKey}</b></div>}
+                {(() => {
+                  const capi = suggestCapo(effKey);
+                  return capi.length > 0 && (
+                    <div className="tool-hint">
+                      🎸 Capo: {capi.map((c, i) => <span key={c.shape}>{i > 0 && " oppure "}<b>{c.capo}° tasto</b> con accordi di <b className="mono">{c.shape}</b></span>)}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="tool">
                 <div className="tool-label">BPM</div>
@@ -174,6 +243,40 @@ export function DetailModal({ song, members, onPatch, onClose, playing, playPrev
               <div className="tool-label">Note di prova</div>
               <textarea rows={3} value={song.note || ""} onChange={(e) => p({ note: e.target.value })} placeholder="Arrangiamento, stacchi, cose da sistemare…" />
             </div>
+
+            <div className="tool tool-full">
+              <div className="tool-label">Tag ed etichette</div>
+              <div className="sanno-row">
+                {[...new Set([...TAG_PRESET, ...(song.tags || [])])].map((t) => (
+                  <button key={t} className={"sanno-pill" + ((song.tags || []).includes(t) ? " sanno-on" : "")} onClick={() => toggleTag(t)}>
+                    #{t}
+                  </button>
+                ))}
+              </div>
+              <div className="stepper" style={{ marginTop: 7 }}>
+                <input value={newTag} onChange={(e) => setNewTag(e.target.value)} placeholder="Nuovo tag…"
+                  onKeyDown={(e) => { if (e.key === "Enter" && newTag.trim()) { toggleTag(newTag.trim().toLowerCase().replace(/\s+/g, "-")); setNewTag(""); } }} />
+                <button className="btn btn-ghost" onClick={() => { if (newTag.trim()) { toggleTag(newTag.trim().toLowerCase().replace(/\s+/g, "-")); setNewTag(""); } }}>+ Tag</button>
+              </div>
+            </div>
+
+            <div className="tool tool-full">
+              <div className="tool-label">Allegati — spartiti, tab, PDF (visibili anche in modalità palco)</div>
+              <div className="file-list">
+                {(files || []).filter((f) => f.tipo === "doc").map((f) => (
+                  <div key={f.id} className="file-row">
+                    <span className="file-name">📄 {f.nome}</span>
+                    <button className="btn btn-ghost" onClick={async () => window.open(await db.fileUrl(f.path), "_blank")}>Apri</button>
+                    <button className="btn btn-danger" onClick={() => rimuoviFile(f)}>✕</button>
+                  </div>
+                ))}
+                {files && files.filter((f) => f.tipo === "doc").length === 0 && <span className="tool-hint">Nessun allegato.</span>}
+              </div>
+              <label className="btn btn-ghost file-upload">
+                {uploading ? "Caricamento…" : "＋ Carica allegato"}
+                <input type="file" accept=".pdf,image/*,.txt" hidden onChange={(e) => { upload(e.target.files, "doc"); e.target.value = ""; }} />
+              </label>
+            </div>
           </div>
         )}
 
@@ -192,8 +295,13 @@ export function DetailModal({ song, members, onPatch, onClose, playing, playPrev
             {editSheet ? (
               <>
                 <textarea className="sheet-editor mono" rows={14} value={song.sheet || ""} onChange={(e) => p({ sheet: e.target.value })}
-                  placeholder={"Due formati supportati:\n\n[Am]Testo con accordi [F]inline\n\noppure\n\nAm        F\nRiga di accordi sopra la riga di testo"} />
-                <div className="tool-hint">Gli accordi vengono riconosciuti e trasposti automaticamente in visualizzazione.</div>
+                  placeholder={"Due formati supportati:\n\n[Am]Testo con accordi [F]inline\n\noppure\n\nAm        F\nRiga di accordi sopra la riga di testo\n\nPuoi anche incollare un file ChordPro e premere il pulsante di conversione."} />
+                <div className="stepper" style={{ marginTop: 8 }}>
+                  <button className="btn btn-ghost" onClick={importaChordPro} title="Rimuove le direttive {…} di un file ChordPro incollato, tenendo testo e accordi">
+                    ⤵ Converti da ChordPro
+                  </button>
+                  <span className="tool-hint">Gli accordi vengono riconosciuti e trasposti automaticamente in visualizzazione.</span>
+                </div>
               </>
             ) : (
               <ChordSheet text={song.sheet} semis={song.transpose || 0} />
@@ -240,6 +348,54 @@ export function DetailModal({ song, members, onPatch, onClose, playing, playPrev
                 <iframe title="YouTube" src={`https://www.youtube.com/embed/${ytId}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
               </div>
             )}
+
+            <div className="tool tool-full" style={{ marginTop: 18 }}>
+              <div className="tool-label">🎙 Registrazioni delle prove</div>
+              <div className="file-list">
+                {(files || []).filter((f) => f.tipo === "audio").map((f) => (
+                  <div key={f.id} className="file-row file-audio">
+                    <span className="file-name">{f.nome}</span>
+                    {fileUrls[f.id] && <audio controls src={fileUrls[f.id]} preload="none" />}
+                    <button className="btn btn-danger" onClick={() => rimuoviFile(f)}>✕</button>
+                  </div>
+                ))}
+                {files && files.filter((f) => f.tipo === "audio").length === 0 && (
+                  <span className="tool-hint">Nessuna registrazione. Carica l'audio della prova e commentalo con la band nella scheda Discussione (es. "al minuto 1:20 lo stacco è sporco").</span>
+                )}
+              </div>
+              <label className="btn btn-ghost file-upload">
+                {uploading ? "Caricamento…" : "＋ Carica registrazione"}
+                <input type="file" accept="audio/*" hidden onChange={(e) => { upload(e.target.files, "audio"); e.target.value = ""; }} />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* ---------- TAB DISCUSSIONE ---------- */}
+        {tab === "disc" && (
+          <div className="detail-body">
+            <div className="comments-list">
+              {comments === null && <span className="tool-hint">Caricamento…</span>}
+              {comments?.length === 0 && <span className="tool-hint">Nessun commento: le decisioni sul brano restano qui invece di perdersi in chat.</span>}
+              {comments?.map((c) => (
+                <div key={c.id} className="comment">
+                  <div className="comment-head">
+                    <b>{c.autore || "Membro"}</b>
+                    {c.timestamp_sec != null && <span className="chip mono">⏱ {fmtDur(c.timestamp_sec)}</span>}
+                    <small>{new Date(c.created_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} {new Date(c.created_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</small>
+                    {c.user_id === profile.id && <button className="member-x" onClick={async () => { await db.deleteComment(c.id); loadComments(); }}>✕</button>}
+                  </div>
+                  <div className="comment-body">{c.body}</div>
+                </div>
+              ))}
+            </div>
+            <div className="comment-form">
+              <input className="comment-min mono" value={commentMin} onChange={(e) => setCommentMin(e.target.value)} placeholder="min:sec" title="Minutaggio opzionale, es. 1:20" />
+              <input className="comment-input" value={newComment} onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Scrivi un commento… (es. abbassiamola di un tono?)"
+                onKeyDown={(e) => e.key === "Enter" && inviaCommento()} />
+              <button className="btn btn-primary" disabled={!newComment.trim()} onClick={inviaCommento}>Invia</button>
+            </div>
           </div>
         )}
       </div>

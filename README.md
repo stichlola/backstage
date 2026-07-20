@@ -101,3 +101,36 @@ src/App.jsx              Logica principale (sessione, dati, azioni ottimistiche)
 - La **Row Level Security** garantisce a livello di database che ognuno veda
   e modifichi solo le band di cui è membro — anche se qualcuno chiamasse le API a mano.
 - La `anon key` è pensata per stare nel frontend: i permessi reali li decide la RLS.
+
+---
+
+## 🔄 Aggiornamento alla v2 (setlist multiple, agenda, file, commenti…)
+
+Se hai già l'app installata (Supabase + Vercel), l'aggiornamento è in 2 passi:
+
+**1. Database** — Supabase → SQL Editor → New query → incolla tutto il contenuto di
+`supabase/migration-v2.sql` → Run. La migrazione è sicura: non tocca i dati esistenti,
+può essere rieseguita, e sposta automaticamente la vecchia scaletta nella nuova
+"Scaletta principale". Crea anche il bucket Storage per registrazioni e spartiti.
+
+**2. Codice** — su GitHub apri il repository → **Add file → Upload files** → trascina
+tutto il contenuto della nuova cartella del progetto (sovrascrive i file con lo stesso
+nome e aggiunge i nuovi) → **Commit changes**. Vercel rileva il commit e fa il deploy
+da solo in ~1 minuto. Le variabili d'ambiente restano le stesse: non serve toccare nulla.
+
+### Novità della v2
+- **Setlist multiple** con data e locale, duplica e archivio storico dei concerti
+- **Stampa/PDF** della scaletta e **link pubblico di sola lettura** per il fonico
+- **Modalità palco**: auto-scroll a velocità regolabile (barra spazio) e vista
+  🌑 anti-riflesso (nero puro, testo ingrandito)
+- **✨ Generatore di scaletta**: minuti desiderati → sequenza di brani pronti,
+  BPM alternati, mai due tonalità uguali di fila
+- **Agenda** prove/concerti con disponibilità dei membri (Ci sono / Forse / No)
+- **Registrazioni delle prove** per brano (audio riascoltabile in app) e
+  **allegati** spartiti/PDF, apribili anche dalla modalità palco
+- **Import ChordPro** e **suggerimento capotasto** in base al transpose
+- **Tag** sui brani con filtro nel repertorio
+- **Discussione** per brano (commenti con minutaggio opzionale, es. ⏱ 1:20)
+- **Vista Studio**: i brani che ogni membro deve ancora imparare
+- **🔔 Centro attività**: registro in tempo reale di chi ha fatto cosa, con
+  badge delle novità non lette

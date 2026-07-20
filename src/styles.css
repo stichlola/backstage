@@ -261,3 +261,106 @@ textarea { resize: vertical; }
 .footer { margin-top: 34px; text-align: center; color: var(--faint); font-size: 12.5px; }
 
 @media (prefers-reduced-motion: reduce) { *, .eq span, .card-ready { animation: none !important; transition: none !important; } }
+
+/* ============================================================
+   v2 — nuovi stili
+   ============================================================ */
+
+/* ---------- Setlist multiple ---------- */
+.sl-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.sl-tabs { display: flex; gap: 6px; flex-wrap: wrap; background: var(--chipbg); padding: 5px; border-radius: calc(var(--r) - 1px); }
+.sl-tab { border: 0; background: transparent; color: var(--sub); font-family: var(--fontb); font-weight: 600; font-size: 13.5px; padding: 8px 14px; border-radius: calc(var(--r) - 4px); cursor: pointer; transition: all .2s; }
+.sl-tab small { font-weight: 400; opacity: .7; margin-left: 4px; font-size: 11px; }
+.sl-tab-on { background: var(--text); color: var(--card); }
+.sl-tab-new { color: var(--faint); }
+.sl-archive { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.sl-archive-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--panel); border: 1px dashed var(--border); border-radius: var(--r); padding: 9px 13px; font-size: 13.5px; color: var(--sub); }
+.sl-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.sl-name { font-family: var(--fontd); font-size: 19px; font-weight: 600; background: transparent; border: 1px solid transparent; padding: 5px 9px; margin-left: -9px; min-width: 180px; flex: 1; }
+.sl-name:hover, .sl-name:focus { border-color: var(--border); background: var(--chipbg); }
+.sl-place { min-width: 140px; }
+.sl-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+
+/* ---------- Stampa / PDF ---------- */
+.print-sheet { display: none; }
+@media print {
+  .no-print { display: none !important; }
+  .app { background: #fff !important; color: #000 !important; padding: 0 !important; }
+  .print-sheet { display: block !important; color: #000; background: #fff; padding: 24px; font-family: Georgia, 'Times New Roman', serif; }
+}
+.print-sheet h1 { font-size: 26px; margin: 0 0 2px; }
+.print-sheet h2 { font-size: 15px; font-weight: normal; color: #444; margin: 0 0 18px; }
+.print-sheet table { width: 100%; border-collapse: collapse; }
+.print-sheet th, .print-sheet td { border-bottom: 1px solid #bbb; text-align: left; padding: 8px 9px; font-size: 13.5px; }
+.print-sheet th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; }
+.print-total { margin-top: 14px; font-size: 12.5px; color: #444; }
+
+/* ---------- Modalità palco v2 ---------- */
+.stage-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stage-speed { width: 110px; accent-color: var(--ok); }
+.stage-doc { border: 1px solid var(--border); cursor: pointer; transition: all .18s; }
+.stage-doc:hover { color: var(--text); border-color: var(--sub); }
+.stage-blackout { background: #000 !important; }
+.stage-blackout .stage-artist, .stage-blackout .stage-next, .stage-blackout .stage-count { color: #999; }
+.stage-blackout .chip { background: #161616; color: #ddd; }
+.stage-blackout .sheet { background: #000; border-color: #222; font-size: 20px !important; line-height: 2 !important; color: #fff; }
+.stage-blackout .sheet-chord { color: #7CFF4F; background: rgba(124,255,79,.10); }
+.stage-blackout .btn { background: #161616; color: #ddd; }
+.stage-blackout .btn-primary { background: #2a2a2a; color: #fff; }
+
+/* ---------- Agenda ---------- */
+.ev-list { display: flex; flex-direction: column; gap: 11px; }
+.ev-past { opacity: .6; margin-top: 12px; }
+.ev-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; animation: card-in .3s; }
+.ev-head { display: flex; align-items: flex-start; gap: 12px; }
+.ev-tipo { font-size: 22px; line-height: 1.2; }
+.ev-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.ev-info b { font-size: 15.5px; }
+.ev-info small { color: var(--sub); font-size: 12.5px; }
+.ev-note { font-style: italic; }
+.ev-avail { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--border); }
+.ev-avail-members { display: flex; gap: 5px; flex-wrap: wrap; }
+.ev-dot { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; text-transform: uppercase; border: 2px solid var(--border); color: var(--faint); }
+.ev-si    { background: rgba(70,200,120,.18); border-color: #3AA96A; color: #3AA96A; }
+.ev-no    { background: rgba(255,80,90,.14);  border-color: #D05860; color: #D05860; }
+.ev-forse { background: rgba(240,168,46,.16); border-color: #C98A1A; color: #C98A1A; }
+.app[data-mode="dark"] .ev-si    { color: #7FD9A4; }
+.app[data-mode="dark"] .ev-no    { color: #F09AA0; }
+.app[data-mode="dark"] .ev-forse { color: #FFD277; }
+.ev-my { display: flex; gap: 6px; flex-wrap: wrap; }
+.ev-btn-on { outline: 2px solid var(--ok); color: var(--text); }
+
+/* ---------- Campanella attività ---------- */
+.bell-badge { position: absolute; top: 2px; right: 2px; background: #E0455A; color: #fff; font-size: 9.5px; min-width: 16px; height: 16px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.user-wrap .btn-settings { position: relative; }
+.bell-menu { width: 320px; max-height: 380px; overflow-y: auto; }
+.bell-row { font-size: 13px; line-height: 1.45; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+.bell-row:last-child { border-bottom: 0; }
+.bell-row small { display: block; color: var(--faint); font-size: 11px; margin-top: 2px; }
+.bell-new { background: color-mix(in srgb, var(--ok) 7%, transparent); border-radius: 7px; }
+
+/* ---------- File (registrazioni / allegati) ---------- */
+.file-list { display: flex; flex-direction: column; gap: 8px; }
+.file-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--chipbg); border: 1px solid var(--border); border-radius: calc(var(--r) - 2px); padding: 8px 12px; animation: card-in .25s; }
+.file-name { font-size: 13px; flex: 1; min-width: 120px; word-break: break-all; }
+.file-audio audio { height: 34px; max-width: 260px; flex: 1; }
+.file-upload { display: inline-flex; align-items: center; width: fit-content; margin-top: 9px; cursor: pointer; }
+
+/* ---------- Commenti ---------- */
+.comments-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; max-height: 340px; overflow-y: auto; }
+.comment { background: var(--chipbg); border: 1px solid var(--border); border-radius: var(--r); padding: 10px 13px; animation: card-in .25s; }
+.comment-head { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; font-size: 13px; flex-wrap: wrap; }
+.comment-head small { color: var(--faint); font-size: 11px; margin-left: auto; }
+.comment-body { font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; }
+.comment-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.comment-min { width: 74px; text-align: center; }
+.comment-input { flex: 1; min-width: 180px; }
+
+/* ---------- Tag ---------- */
+.chip-tag { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+
+/* ---------- Pagina pubblica ---------- */
+.public-page { max-width: 860px; margin: 0 auto; }
+.public-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
+.public-head > div { flex: 1; }
+.public-list .setlist-row { cursor: default; }
