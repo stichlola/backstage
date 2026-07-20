@@ -10,7 +10,7 @@ import { NewSongModal, SongCard } from "./components/song";
 import { DetailModal } from "./components/DetailModal";
 import { StageMode } from "./components/StageMode";
 import { SetlistPanel, PrintSheet } from "./components/SetlistPanel";
-import { Agenda, StudioView, ActivityBell, PublicSetlistPage } from "./components/extras";
+import { ActivityBell, PublicSetlistPage } from "./components/extras";
 
 /* Root senza hook: smista tra pagina pubblica e app principale */
 export default function Root() {
@@ -43,7 +43,6 @@ function MainApp() {
   const [songs, setSongs] = useState([]);
   const [setlists, setSetlists] = useState([]);
   const [currentSetlistId, setCurrentSetlistId] = useState(null);
-  const [events, setEvents] = useState([]);
   const [activity, setActivity] = useState([]);
   const [invites, setInvites] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -64,7 +63,6 @@ function MainApp() {
   const band = bands.find((b) => b.id === currentBandId) || null;
   const membersById = useMemo(() => Object.fromEntries((band?.members || []).map((m) => [m.id, m])), [band]);
   const membersByName = useMemo(() => Object.fromEntries((band?.members || []).map((m) => [m.nome, m])), [band]);
-  const myMember = band && profile ? band.members.find((m) => m.userId === profile.id) : null;
 
   /* ---------- auth ---------- */
   useEffect(() => {
@@ -76,6 +74,11 @@ function MainApp() {
 
   const fail = (e) => { console.error(e); setErrMsg(e.message || String(e)); setTimeout(() => setErrMsg(null), 5000); };
   const act = (msg) => { if (band && profile) db.logActivity(band.id, profile.id, profile.nome, msg); };
+  const readIgnored = () => { try { return JSON.parse(localStorage.getItem("bs-inv-ignored") || "[]"); } catch { return []; } };
+  const ignoreInvite = (id) => {
+    try { localStorage.setItem("bs-inv-ignored", JSON.stringify([...new Set([...readIgnored(), id])])); } catch { /* incognito */ }
+    setInvites((xs) => xs.filter((x) => x.id !== id));
+  };
 
   /* ---------- caricamenti ---------- */
   const loadAll = useCallback(async (keepBand = true) => {
@@ -85,11 +88,12 @@ function MainApp() {
       const [prof, myBands, myInvites] = await Promise.all([
         db.getProfile(session.user.id),
         db.getMyBands(),
-        db.getMyInvites().catch(() => []),
+        db.getMyInvites(session.user.email).catch(() => []),
       ]);
       setProfile(prof);
       setBands(myBands);
-      setInvites(myInvites);
+      // escludi gli inviti ignorati in passato e quelli per band di cui faccio già parte
+      setInvites(myInvites.filter((i) => !readIgnored().includes(i.id) && !myBands.some((b) => b.id === i.band_id)));
       setCurrentBandId((cur) => (keepBand && myBands.some((b) => b.id === cur) ? cur : myBands[0]?.id || null));
     } catch (e) { fail(e); }
     setLoadingData(false);
@@ -97,19 +101,18 @@ function MainApp() {
 
   useEffect(() => {
     if (session?.user) loadAll(false);
-    else { setProfile(null); setBands([]); setSongs([]); setSetlists([]); setEvents([]); setActivity([]); setCurrentBandId(null); }
+    else { setProfile(null); setBands([]); setSongs([]); setSetlists([]); setActivity([]); setCurrentBandId(null); }
   }, [session, loadAll]);
 
   const refetchBandData = useCallback(async () => {
-    if (!band) { setSongs([]); setSetlists([]); setEvents([]); setActivity([]); return; }
+    if (!band) { setSongs([]); setSetlists([]); setActivity([]); return; }
     try {
-      const [s, sl, ev, ac] = await Promise.all([
+      const [s, sl, ac] = await Promise.all([
         db.getSongs(band.id, membersById),
         db.getSetlists(band.id),
-        db.getEvents(band.id),
         db.getActivity(band.id),
       ]);
-      setSongs(s); setSetlists(sl); setEvents(ev); setActivity(ac);
+      setSongs(s); setSetlists(sl); setActivity(ac);
       setCurrentSetlistId((cur) => {
         if (sl.some((x) => x.id === cur && !x.archived)) return cur;
         return sl.find((x) => !x.archived)?.id || sl[0]?.id || null;
@@ -296,19 +299,6 @@ function MainApp() {
     } catch (e) { fail(e); }
   };
 
-  /* ---------- agenda ---------- */
-  const createEvent = async (ev) => {
-    try {
-      await db.createEvent(currentBandId, ev);
-      act(`ha creato l'evento «${ev.titolo}»`);
-      refetchBandData();
-    } catch (e) { fail(e); }
-  };
-  const deleteEvent = async (id) => { try { await db.deleteEvent(id); refetchBandData(); } catch (e) { fail(e); } };
-  const setAvailability = async (eventId, memberId, stato) => {
-    try { await db.setAvailability(eventId, memberId, stato); refetchBandData(); } catch (e) { fail(e); }
-  };
-
   /* ---------- drag & drop ---------- */
   const onDragStart = (e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = "move"; };
   const onDropCol = (statoId) => {
@@ -355,7 +345,7 @@ function MainApp() {
         <div key={inv.id} className="invite-row">
           📨 Sei stato invitato in <b>«{inv.bands?.nome || "una band"}»</b> come <b>{inv.ruolo}</b>
           <button className="btn btn-primary" onClick={() => acceptInvite(inv.id)}>Accetta</button>
-          <button className="btn btn-ghost" onClick={() => setInvites((xs) => xs.filter((x) => x.id !== inv.id))}>Ignora</button>
+          <button className="btn btn-ghost" onClick={() => ignoreInvite(inv.id)}>Ignora</button>
         </div>
       ))}
     </div>
@@ -429,10 +419,6 @@ function MainApp() {
             <button className={"tab" + (vista === "scaletta" ? " tab-on" : "")} onClick={() => setVista("scaletta")}>
               Scaletta {scalettaSongs.length > 0 && <span className="tab-badge mono">{scalettaSongs.length}</span>}
             </button>
-            <button className={"tab" + (vista === "agenda" ? " tab-on" : "")} onClick={() => setVista("agenda")}>
-              Agenda {events.filter((e) => new Date(e.data) > new Date()).length > 0 && <span className="tab-badge mono">{events.filter((e) => new Date(e.data) > new Date()).length}</span>}
-            </button>
-            <button className={"tab" + (vista === "studio" ? " tab-on" : "")} onClick={() => setVista("studio")}>Studio</button>
           </div>
           {vista === "repertorio" && (
             <>
@@ -486,18 +472,6 @@ function MainApp() {
             onRemoveFromSetlist={onRemoveFromSetlist} onMove={onMoveInSetlist}
             onOpenSong={(s) => setDetailId(s.id)} onStage={() => setStageMode(true)} onGenerate={onGenerate}
           />
-        )}
-
-        {vista === "agenda" && (
-          <Agenda band={band} events={events} setlists={setlists} myMember={myMember}
-            onCreate={createEvent} onUpdate={(id, patch) => db.updateEvent(id, patch).then(refetchBandData).catch(fail)}
-            onDelete={deleteEvent} onSetAvailability={setAvailability} />
-        )}
-
-        {vista === "studio" && (
-          <StudioView band={band} songs={songsView} myMember={myMember} statusColors={statusColors}
-            onOpenSong={(s) => setDetailId(s.id)}
-            onImparata={(s, nome) => patchSong(s, { sanno: [...(s.sanno || []), nome] })} />
         )}
 
         {showNew && <NewSongModal onSave={addSong} onClose={() => setShowNew(false)} />}

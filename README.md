@@ -125,12 +125,16 @@ da solo in ~1 minuto. Le variabili d'ambiente restano le stesse: non serve tocca
   🌑 anti-riflesso (nero puro, testo ingrandito)
 - **✨ Generatore di scaletta**: minuti desiderati → sequenza di brani pronti,
   BPM alternati, mai due tonalità uguali di fila
-- **Agenda** prove/concerti con disponibilità dei membri (Ci sono / Forse / No)
 - **Registrazioni delle prove** per brano (audio riascoltabile in app) e
   **allegati** spartiti/PDF, apribili anche dalla modalità palco
 - **Import ChordPro** e **suggerimento capotasto** in base al transpose
 - **Tag** sui brani con filtro nel repertorio
 - **Discussione** per brano (commenti con minutaggio opzionale, es. ⏱ 1:20)
-- **Vista Studio**: i brani che ogni membro deve ancora imparare
 - **🔔 Centro attività**: registro in tempo reale di chi ha fatto cosa, con
   badge delle novità non lette
+
+### v2.1
+- Rimosse le sezioni Agenda e Studio (le tabelle nel database restano ma sono
+  inerti: nessuna azione richiesta lato Supabase)
+- Corretti gli inviti: il proprietario non vede più come propri gli inviti che
+  ha mandato agli altri, e "Ignora" ora è persistente

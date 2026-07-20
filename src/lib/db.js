@@ -84,11 +84,15 @@ export async function createInvite(bandId, email, ruolo) {
     .insert({ band_id: bandId, email: email.toLowerCase(), ruolo });
   if (error) throw error;
 }
-export async function getMyInvites() {
+export async function getMyInvites(email) {
+  // Solo gli inviti destinati alla MIA email: senza questo filtro il
+  // proprietario vedrebbe (per via della RLS) anche gli inviti che ha
+  // mandato agli altri, come se fossero rivolti a lui.
   const { data, error } = await supabase
     .from("band_invites")
     .select("*, bands(nome)")
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .eq("email", (email || "").toLowerCase());
   if (error) throw error;
   return data;
 }
@@ -219,34 +223,6 @@ export async function replaceSetlistSongs(setlistId, songIds) {
   }
 }
 
-/* ---------- agenda ---------- */
-export async function getEvents(bandId) {
-  const { data, error } = await supabase
-    .from("events")
-    .select("*, event_availability(*)")
-    .eq("band_id", bandId)
-    .order("data");
-  if (error) throw error;
-  return data;
-}
-export async function createEvent(bandId, ev) {
-  const { error } = await supabase.from("events").insert({ band_id: bandId, ...ev });
-  if (error) throw error;
-}
-export async function updateEvent(id, patch) {
-  const { error } = await supabase.from("events").update(patch).eq("id", id);
-  if (error) throw error;
-}
-export async function deleteEvent(id) {
-  const { error } = await supabase.from("events").delete().eq("id", id);
-  if (error) throw error;
-}
-export async function setAvailability(eventId, memberId, stato) {
-  const { error } = await supabase.from("event_availability")
-    .upsert({ event_id: eventId, member_id: memberId, stato });
-  if (error) throw error;
-}
-
 /* ---------- file (registrazioni + spartiti) ---------- */
 export async function getSongFiles(songId) {
   const { data, error } = await supabase.from("song_files")
@@ -323,8 +299,6 @@ export function subscribeBandV2(bandId, onChange) {
     .channel(`band2-${bandId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "setlists", filter: `band_id=eq.${bandId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "setlist_songs" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `band_id=eq.${bandId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "event_availability" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "song_comments", filter: `band_id=eq.${bandId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "activity_log", filter: `band_id=eq.${bandId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "song_files", filter: `band_id=eq.${bandId}` }, onChange)
