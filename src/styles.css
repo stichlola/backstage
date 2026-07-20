@@ -368,3 +368,7 @@ textarea { resize: vertical; }
 /* ---------- Reset password ---------- */
 .auth-forgot { display: block; margin: 14px auto 0; font-size: 13px; color: var(--sub); }
 .auth-forgot:hover { color: var(--text); }
+
+/* ---------- PWA / offline ---------- */
+.offline-banner { position: sticky; top: 0; z-index: 70; text-align: center; background: rgba(240,168,46,.14); border: 1px solid rgba(240,168,46,.45); color: #C88A1A; border-radius: var(--r); padding: 9px 14px; font-size: 13px; margin-bottom: 14px; animation: card-in .3s; }
+.app[data-mode="dark"] .offline-banner { color: #FFD79A; }

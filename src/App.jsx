@@ -38,6 +38,7 @@ const publicVars = {
 function MainApp() {
   const [session, setSession] = useState(undefined);
   const [recovery, setRecovery] = useState(false);
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [profile, setProfile] = useState(null);
   const [bands, setBands] = useState([]);
   const [currentBandId, setCurrentBandId] = useState(null);
@@ -75,6 +76,15 @@ function MainApp() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const on = () => { setOnline(true); refetchBandDataRef.current?.(); };
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+  const refetchBandDataRef = useRef(null);
 
   const fail = (e) => { console.error(e); setErrMsg(e.message || String(e)); setTimeout(() => setErrMsg(null), 5000); };
   const act = (msg) => { if (band && profile) db.logActivity(band.id, profile.id, profile.nome, msg); };
@@ -124,7 +134,7 @@ function MainApp() {
     } catch (e) { fail(e); }
   }, [band, membersById]);
 
-  useEffect(() => { refetchBandData(); }, [refetchBandData]);
+  useEffect(() => { refetchBandData(); refetchBandDataRef.current = refetchBandData; }, [refetchBandData]);
 
   /* realtime: qualsiasi cambiamento -> refetch con debounce */
   useEffect(() => {
@@ -384,6 +394,7 @@ function MainApp() {
     <div className="app" style={cssVars} data-mode={st.mode}>
       <div className="no-print">
         {errMsg && <div className="toast-err">⚠ {errMsg}</div>}
+        {!online && <div className="offline-banner">📴 Sei offline — consulti gli ultimi dati salvati, le modifiche riprenderanno con la connessione</div>}
 
         <header className="header">
           <div className="header-left">

@@ -131,3 +131,22 @@ da solo in ~1 minuto. Le variabili d'ambiente restano le stesse: non serve tocca
   Le email partono dal servizio integrato di Supabase (nessuna configurazione,
   con un limite di poche email/ora sul piano Free — sufficiente per una band).
 - Rimosso il login con Google.
+
+### v2.3 — PWA (app installabile + offline)
+Backstage ora è una Progressive Web App:
+- **Installabile** su telefono e computer con icona propria, si apre a schermo
+  intero come un'app nativa.
+  - *Android/Chrome*: banner "Installa app" o menu ⋮ → "Aggiungi a schermata Home"
+  - *iPhone/Safari*: Condividi → "Aggiungi alla schermata Home"
+  - *Desktop Chrome/Edge*: icona di installazione nella barra degli indirizzi
+- **Offline**: l'interfaccia e gli ultimi dati consultati (repertorio, scalette,
+  testi e accordi) restano disponibili senza connessione — utile sul palco di un
+  locale senza segnale. Un banner 📴 avvisa quando sei offline; al ritorno della
+  rete i dati si risincronizzano da soli.
+- **Aggiornamenti automatici**: a ogni nuovo deploy l'app installata si aggiorna
+  da sola alla prossima apertura.
+
+Limiti onesti dell'offline: si consultano i dati già visti (in sola lettura);
+le modifiche e la ricerca di nuovi brani richiedono connessione, e la sessione
+di accesso resta valida offline per la sua durata naturale (~1 ora dal l'ultimo
+rinnovo). Consiglio pratico: apri l'app una volta col Wi-Fi prima del concerto.
