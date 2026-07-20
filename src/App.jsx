@@ -2,8 +2,8 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { supabase, configOk } from "./lib/supabase";
 import * as db from "./lib/db";
 import { THEMES, STATI, nextStato, statoDi, fmtDur } from "./lib/themes";
-import { Equalizer, Avatar, GoogleG } from "./components/common";
-import { AuthScreen, SetupScreen } from "./components/AuthScreen";
+import { Equalizer, Avatar } from "./components/common";
+import { AuthScreen, SetupScreen, NewPasswordScreen } from "./components/AuthScreen";
 import { CreateBandModal, BandSwitcher } from "./components/band";
 import { SettingsModal } from "./components/SettingsModal";
 import { NewSongModal, SongCard } from "./components/song";
@@ -37,6 +37,7 @@ const publicVars = {
 
 function MainApp() {
   const [session, setSession] = useState(undefined);
+  const [recovery, setRecovery] = useState(false);
   const [profile, setProfile] = useState(null);
   const [bands, setBands] = useState([]);
   const [currentBandId, setCurrentBandId] = useState(null);
@@ -68,7 +69,10 @@ function MainApp() {
   useEffect(() => {
     if (!configOk) { setSession(null); return; }
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -338,6 +342,13 @@ function MainApp() {
     );
   }
   if (!session) return <div className="app" style={cssVars} data-mode={st.mode}><AuthScreen colors={statusColors} /></div>;
+  if (recovery) {
+    return (
+      <div className="app" style={cssVars} data-mode={st.mode}>
+        <NewPasswordScreen colors={statusColors} onDone={() => setRecovery(false)} />
+      </div>
+    );
+  }
 
   const InvitesBanner = () => invites.length > 0 && (
     <div className="invites-banner no-print">
@@ -400,7 +411,6 @@ function MainApp() {
                     <Avatar nome={profile.nome} color={profile.color} size={40} />
                     <div><b>{profile.nome}</b><small>{session.user.email}</small></div>
                   </div>
-                  {session.user.app_metadata?.provider === "google" && <div className="user-provider"><GoogleG /> Accesso con Google</div>}
                   <div className="user-provider">🎸 {bands.length} backstage</div>
                   <button className="btn btn-ghost btn-block" onClick={() => { setShowSettings(true); setUserMenu(false); }}>⚙ Impostazioni</button>
                   <button className="btn btn-ghost btn-block" onClick={() => { setShowCreateBand(true); setUserMenu(false); }}>＋ Nuovo backstage</button>

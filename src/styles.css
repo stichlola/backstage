@@ -364,3 +364,7 @@ textarea { resize: vertical; }
 .public-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
 .public-head > div { flex: 1; }
 .public-list .setlist-row { cursor: default; }
+
+/* ---------- Reset password ---------- */
+.auth-forgot { display: block; margin: 14px auto 0; font-size: 13px; color: var(--sub); }
+.auth-forgot:hover { color: var(--text); }
