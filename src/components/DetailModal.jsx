@@ -3,10 +3,12 @@ import { NOTES, transposeKeyName, extractChords, detectKeyFromChords, suggestCap
 import { STATI, fmtDur } from "../lib/themes";
 import { ChordSheet, useMetronome } from "./common";
 import * as db from "../lib/db";
+import { useDialog } from "./dialog";
 
 const TAG_PRESET = ["rock", "pop", "lenta", "energica", "ballabile", "apertura", "chiusura", "bis", "acustica", "medley"];
 
 export function DetailModal({ song, members, band, profile, onPatch, onClose, playing, playPreview, onActivity }) {
+  const dialog = useDialog();
   const [tab, setTab] = useState("info");
   const [editSheet, setEditSheet] = useState(false);
   const [results, setResults] = useState(null);
@@ -44,11 +46,11 @@ export function DetailModal({ song, members, band, profile, onPatch, onClose, pl
       await db.uploadSongFile(band.id, song.id, file, tipo);
       onActivity?.(`ha caricato ${tipo === "audio" ? "una registrazione" : "un allegato"} su «${song.titolo}»`);
       await loadFiles();
-    } catch (e) { console.error(e); alert("Caricamento fallito: " + e.message); }
+    } catch (e) { console.error(e); dialog.alert({ title: "Caricamento fallito", message: e.message }); }
     setUploading(false);
   };
   const rimuoviFile = async (f) => {
-    if (!window.confirm(`Eliminare "${f.nome}"?`)) return;
+    if (!await dialog.confirm({ title: "Eliminare il file?", message: `«${f.nome}» verrà rimosso definitivamente.`, okLabel: "Elimina", danger: true })) return;
     try { await db.deleteSongFile(f); await loadFiles(); } catch (e) { console.error(e); }
   };
   const inviaCommento = async () => {

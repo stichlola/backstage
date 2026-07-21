@@ -150,3 +150,15 @@ Limiti onesti dell'offline: si consultano i dati già visti (in sola lettura);
 le modifiche e la ricerca di nuovi brani richiedono connessione, e la sessione
 di accesso resta valida offline per la sua durata naturale (~1 ora dal l'ultimo
 rinnovo). Consiglio pratico: apri l'app una volta col Wi-Fi prima del concerto.
+
+### v2.4
+- **Dialog a tema**: conferme, richieste di testo e avvisi ora usano modali
+  nello stile dell'app al posto di quelli grigi del browser (eliminazione brani,
+  scalette e file, nome nuova scaletta, link fonico…)
+- **Controlli moderni**: select con freccia personalizzata, date picker in tema
+  chiaro/scuro, checkbox e slider ridisegnati, niente spinner sui campi numerici,
+  scrollbar in tema
+- **Scaletta**: la gestione dei brani è tutta nella sezione Scaletta — nuovo
+  pulsante "＋ Aggiungi brani" con ricerca nel repertorio (il pulsante sulla
+  card del repertorio è stato rimosso) e **riordino drag & drop** trascinando
+  le righe dalla maniglia ⋮⋮

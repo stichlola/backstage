@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { searchSongsAPI } from "../lib/api";
 import { fmtDur, STATI } from "../lib/themes";
 import { transposeKeyName } from "../lib/musicTheory";
+import { useDialog } from "./dialog";
 
 export function NewSongModal({ onSave, onClose }) {
   const [step, setStep] = useState("search");
@@ -168,7 +169,15 @@ export function NewSongModal({ onSave, onClose }) {
   );
 }
 
-export function SongCard({ song, colors, membersCount, onOpen, onAdvance, onDelete, onToggleSetlist, onTogglePriorita, onDragStart, playing, playPreview }) {
+export function SongCard({ song, colors, membersCount, onOpen, onAdvance, onDelete, onTogglePriorita, onDragStart, playing, playPreview }) {
+  const dialog = useDialog();
+  const chiediElimina = async () => {
+    if (await dialog.confirm({
+      title: "Eliminare il brano?",
+      message: `«${song.titolo}» verrà rimosso dal repertorio, dalle scalette e con lui registrazioni, allegati e commenti.`,
+      okLabel: "Elimina", danger: true,
+    })) onDelete(song);
+  };
   const idx = STATI.findIndex((s) => s.id === song.stato);
   const accent = colors[idx];
   const effKey = transposeKeyName(song.tonalita, song.transpose || 0);
@@ -199,10 +208,7 @@ export function SongCard({ song, colors, membersCount, onOpen, onAdvance, onDele
       {song.note && <div className="card-note">{song.note}</div>}
       <div className="card-actions" onClick={(e) => e.stopPropagation()}>
         {song.stato !== "pronta" && <button className="btn btn-advance" onClick={() => onAdvance(song)}>Avanza →</button>}
-        <button className={"btn btn-ghost" + (song.inSetlist ? " in-setlist" : "")} onClick={() => onToggleSetlist(song)}>
-          {song.inSetlist ? "✓ Scaletta" : "+ Scaletta"}
-        </button>
-        <button className="btn btn-danger" onClick={() => onDelete(song)}>✕</button>
+        <button className="btn btn-danger" onClick={chiediElimina}>✕</button>
       </div>
     </div>
   );

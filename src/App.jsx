@@ -11,6 +11,7 @@ import { DetailModal } from "./components/DetailModal";
 import { StageMode } from "./components/StageMode";
 import { SetlistPanel, PrintSheet } from "./components/SetlistPanel";
 import { ActivityBell, PublicSetlistPage } from "./components/extras";
+import { DialogProvider } from "./components/dialog";
 
 /* Root senza hook: smista tra pagina pubblica e app principale */
 export default function Root() {
@@ -239,12 +240,10 @@ function MainApp() {
     setCurrentSetlistId(id);
     return id;
   };
-  const onCreateSetlist = async () => {
-    const nome = window.prompt("Nome della nuova scaletta:", "Nuova scaletta");
-    if (nome === null) return;
+  const onCreateSetlist = async (nome) => {
     try {
-      const id = await db.createSetlist(currentBandId, { nome: nome.trim() || "Nuova scaletta" });
-      act(`ha creato la scaletta «${nome.trim() || "Nuova scaletta"}»`);
+      const id = await db.createSetlist(currentBandId, { nome });
+      act(`ha creato la scaletta «${nome}»`);
       await refetchBandData();
       setCurrentSetlistId(id);
     } catch (e) { fail(e); }
@@ -270,20 +269,15 @@ function MainApp() {
   const onDeleteSetlist = async (sl) => {
     try { await db.deleteSetlist(sl.id); await refetchBandData(); } catch (e) { fail(e); }
   };
-  const toggleSetlist = async (song) => {
+  const addSongsToSetlist = async (songIds) => {
     try {
       const slId = await ensureSetlist();
       const sl = setlists.find((s) => s.id === slId) || currentSetlist;
-      if (setlistSongIds.has(song.id)) {
-        patchSetlistLocal(slId, { rows: (sl?.rows || []).filter((r) => r.song_id !== song.id) });
-        await db.removeFromSetlist(slId, song.id);
-        act(`ha tolto «${song.titolo}» dalla scaletta`);
-      } else {
-        const maxOrd = Math.max(0, ...(sl?.rows || []).map((r) => r.ordine));
-        patchSetlistLocal(slId, { rows: [...(sl?.rows || []), { id: "tmp" + song.id, song_id: song.id, ordine: maxOrd + 1, setlist_id: slId }] });
-        await db.addToSetlist(slId, song.id, maxOrd + 1);
-        act(`ha aggiunto «${song.titolo}» alla scaletta`);
-      }
+      let ord = Math.max(0, ...(sl?.rows || []).map((r) => r.ordine));
+      await db.addManyToSetlist(slId, songIds.map((id) => ({ song_id: id, ordine: ++ord })));
+      const nomi = songIds.map((id) => songs.find((s) => s.id === id)?.titolo).filter(Boolean);
+      if (nomi.length === 1) act(`ha aggiunto «${nomi[0]}» alla scaletta`);
+      else if (nomi.length > 1) act(`ha aggiunto ${nomi.length} brani alla scaletta`);
       refetchBandData();
     } catch (e) { fail(e); }
   };
@@ -291,16 +285,11 @@ function MainApp() {
     patchSetlistLocal(sl.id, { rows: sl.rows.filter((r) => r.song_id !== song.id) });
     db.removeFromSetlist(sl.id, song.id).then(() => act(`ha tolto «${song.titolo}» dalla scaletta «${sl.nome}»`)).catch(fail);
   };
-  const onMoveInSetlist = (sl, i, dir) => {
-    const rows = [...sl.rows].sort((a, b) => a.ordine - b.ordine);
-    const j = i + dir;
-    if (j < 0 || j >= rows.length) return;
-    const a = rows[i], b = rows[j];
+  const onReorderSetlist = (sl, orderedRowIds) => {
     patchSetlistLocal(sl.id, {
-      rows: sl.rows.map((r) => (r.id === a.id ? { ...r, ordine: b.ordine } : r.id === b.id ? { ...r, ordine: a.ordine } : r)),
+      rows: orderedRowIds.map((rid, i) => ({ ...sl.rows.find((r) => r.id === rid), ordine: i + 1 })),
     });
-    db.setRowOrder(a.id, b.ordine).catch(fail);
-    db.setRowOrder(b.id, a.ordine).catch(fail);
+    db.reorderSetlist(orderedRowIds).catch(fail);
   };
   const onGenerate = async (minuti, songIds) => {
     try {
@@ -392,6 +381,7 @@ function MainApp() {
 
   return (
     <div className="app" style={cssVars} data-mode={st.mode}>
+      <DialogProvider>
       <div className="no-print">
         {errMsg && <div className="toast-err">⚠ {errMsg}</div>}
         {!online && <div className="offline-banner">📴 Sei offline — consulti gli ultimi dati salvati, le modifiche riprenderanno con la connessione</div>}
@@ -473,7 +463,7 @@ function MainApp() {
                     {list.map((s) => (
                       <SongCard key={s.id} song={s} colors={statusColors} membersCount={band.members.length}
                         onOpen={(x) => setDetailId(x.id)} onAdvance={advance} onDelete={removeSong}
-                        onToggleSetlist={toggleSetlist} onTogglePriorita={togglePriorita}
+                        onTogglePriorita={togglePriorita}
                         onDragStart={onDragStart} playing={playing} playPreview={playPreview} />
                     ))}
                     {list.length === 0 && <div className="col-empty">{loadingData ? "Caricamento…" : "Trascina qui un brano"}</div>}
@@ -490,7 +480,7 @@ function MainApp() {
             setCurrentSetlistId={setCurrentSetlistId} songsById={songsById} statusColors={statusColors}
             onCreateSetlist={onCreateSetlist} onUpdateSetlist={onUpdateSetlist}
             onDuplicateSetlist={onDuplicateSetlist} onArchiveSetlist={onArchiveSetlist} onDeleteSetlist={onDeleteSetlist}
-            onRemoveFromSetlist={onRemoveFromSetlist} onMove={onMoveInSetlist}
+            onRemoveFromSetlist={onRemoveFromSetlist} onReorder={onReorderSetlist} onAddSongs={addSongsToSetlist}
             onOpenSong={(s) => setDetailId(s.id)} onStage={() => setStageMode(true)} onGenerate={onGenerate}
           />
         )}
@@ -516,6 +506,7 @@ function MainApp() {
 
       {/* foglio stampabile: visibile solo con Stampa/PDF */}
       <PrintSheet bandName={band.nome} setlist={currentSetlist} songs={scalettaSongs} gapSec={band.gapSec || 0} />
+      </DialogProvider>
     </div>
   );
 }

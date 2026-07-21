@@ -305,3 +305,17 @@ export function subscribeBandV2(bandId, onChange) {
     .subscribe();
   return () => supabase.removeChannel(ch);
 }
+
+/* ---------- v2.4: gestione scaletta ---------- */
+export async function addManyToSetlist(setlistId, entries) {
+  if (!entries.length) return;
+  const { error } = await supabase.from("setlist_songs")
+    .upsert(entries.map((e) => ({ setlist_id: setlistId, ...e })), { onConflict: "setlist_id,song_id" });
+  if (error) throw error;
+}
+export async function reorderSetlist(orderedRowIds) {
+  await Promise.all(orderedRowIds.map((rid, i) =>
+    supabase.from("setlist_songs").update({ ordine: i + 1 }).eq("id", rid)
+      .then(({ error }) => { if (error) throw error; })
+  ));
+}
